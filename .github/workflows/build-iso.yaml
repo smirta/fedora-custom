@@ -1,0 +1,30 @@
+on:
+  release:
+    types: [published]
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
+    - name: Set up Python
+      uses: actions/setup-python@v2
+      with:
+        python-version: 3.8
+    - name: Install dependencies
+      run: |
+        sudo dnf install -y livecd-tools pykickstart
+    - name: Clone Fedora ISO creation scripts
+      run: git clone https://pagure.io/fedora-kickstarts.git
+    - name: Create custom Fedora ISO
+      env:
+        ISO_NAME: custom-fedora-desktop.iso
+        USERNAME: ${{ secrets.USERNAME }}
+        PASSWORD: ${{ secrets.PASSWORD }}
+        ENCRYPTION: ${{ secrets.ENCRYPTION }}
+      run: |
+        cd fedora-kickstarts
+        ${{ github.workspace }}/create-desktop-iso.sh \
+          --iso-name $ISO_NAME \
+          --username $USERNAME \
+          --password $PASSWORD \
+          --encryption $ENCRYPTION
