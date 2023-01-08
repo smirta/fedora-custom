@@ -1,31 +1,60 @@
-name: Create Fedora Desktop ISO
+name: Create Custom Fedora ISO
+
 on:
   workflow_dispatch:
   pull_request:
+
+env:
+  USERNAME: ${{ secrets.USERNAME }}
+  PASSWORD: ${{ secrets.PASSWORD }}
+  LUKS_ENCRYPTION: ${{ secrets.LUKS_ENCRYPTION }}
+
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v2
-    - name: Set up Python
-      uses: actions/setup-python@v2
-      with:
-        python-version: 3.8
-    - name: Install dependencies
+    - name: Set up QEMU
       run: |
-        sudo apt install -y livecd-tools pykickstart
-    - name: Clone Fedora ISO creation scripts
-      run: git clone https://pagure.io/fedora-kickstarts.git
-    - name: Create custom Fedora ISO
-      env:
-        ISO_NAME: custom-fedora-desktop.iso
-        USERNAME: ${{ secrets.USERNAME }}
-        PASSWORD: ${{ secrets.PASSWORD }}
-        ENCRYPTION: ${{ secrets.ENCRYPTION }}
+        sudo apt-get update
+        sudo apt-get install -y qemu-utils
+    - name: Download Fedora ISO
       run: |
-        cd fedora-kickstarts
-        ${{ github.workspace }}/create-desktop-iso.sh \
-          --iso-name $ISO_NAME \
-          --username $USERNAME \
-          --password $PASSWORD \
-          --encryption $ENCRYPTION
+        wget https://download.fedoraproject.org/pub/fedora/linux/releases/37/Workstation/x86_64/iso/Fedora-Workstation-Live-x86_64-37-1.7.iso
+    - name: Create a working directory for the ISO
+      run: |
+        mkdir custom-iso
+        sudo mount -o loop Fedora-Workstation-Live-x86_64-32-1.6.iso custom-iso
+    - name: Modify the ISO to include custom kickstart file
+      run: |
+        echo "lang en_US.UTF-8
+        keyboard us
+        timezone --utc America/New_York
+        bootloader --location=mbr
+        zerombr
+        clearpart --all --initlabel
+        autopart --type=lvm
+        part / --fstype=ext4 --size=8192
+        rootpw --iscrypted $PASSWORD
+        user --name=$USERNAME --password=$PASSWORD --iscrypted --gecos \"First Last,RoomNumber,WorkPhone,HomePhone\"
+        services --enabled=\"ssh\"
+        %packages
+        @^minimal
+        %end
+        %post
+        # Set up LUKS encryption
+        cryptsetup luksFormat /dev/sda2
+        cryptsetup open --type luks /dev/sda2 luks
+        mkfs.ext4 /dev/mapper/luks
+        mount /dev/mapper/luks /mnt
+        echo \"/dev/mapper/luks / ext4 defaults 1 1\" >> /mnt/etc/fstab
+        %end" > custom-iso/ks.cfg
+    - name: Modify the boot menu to use the custom kickstart file
+      run: |
+        sed -i 's/append initrd=initrd.img/append initrd=initrd.img inst.stage2=hd:LABEL=Fedora-WS-Live-32-1-6 ks=cdrom:\/ks.cfg/' custom-iso/isolinux/isolinux.cfg
+    - name: Unmount the ISO
+      run: |
+        sudo umount custom-iso
+    - name: Create the custom ISO
+      run: |
+        mkisofs -o custom.iso -b isolinux/isolinux.bin -c isolinux/boot.cat -no-emul-boot -boot-load-size 4 -
