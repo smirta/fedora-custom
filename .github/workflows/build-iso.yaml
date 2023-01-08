@@ -20,7 +20,7 @@ jobs:
         sudo apt-get install -y qemu-utils
     - name: Download Fedora ISO
       run: |
-        wget https://download.fedoraproject.org/pub/fedora/linux/releases/37/Workstation/x86_64/iso/Fedora-Workstation-Live-x86_64-37-1.7.iso
+        wget -nv https://download.fedoraproject.org/pub/fedora/linux/releases/37/Workstation/x86_64/iso/Fedora-Workstation-Live-x86_64-37-1.7.iso
     - name: Create a working directory for the ISO
       run: |
         mkdir custom-iso
