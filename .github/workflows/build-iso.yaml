@@ -13,7 +13,7 @@ jobs:
         python-version: 3.8
     - name: Install dependencies
       run: |
-        sudo dnf install -y livecd-tools pykickstart
+        sudo apt install -y livecd-tools pykickstart
     - name: Clone Fedora ISO creation scripts
       run: git clone https://pagure.io/fedora-kickstarts.git
     - name: Create custom Fedora ISO
